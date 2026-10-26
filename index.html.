@@ -1,0 +1,96 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClipRush — Make clips. Skip the hassle.</title>
+<style>
+body{margin:0;background:#10121d;color:#f5f6ff;font:16px system-ui,sans-serif;padding:20px}
+main{max-width:700px;margin:auto}
+h1{font-size:42px;line-height:1.1}
+h1 span{color:#9b7bff}
+section{background:#191d2b;border:1px solid #343b52;border-radius:16px;padding:18px;margin:18px 0}
+button{background:#8d72f6;color:white;border:0;border-radius:9px;padding:12px;font-weight:bold;width:100%;margin-top:12px}
+input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:10px;background:#10121d;color:white;border:1px solid #343b52;border-radius:8px}
+p{color:#b8bfd3}
+</style>
+</head>
+<body>
+<main>
+<h2>⚡ ClipRush</h2>
+<p>Your video. Your best moments.</p>
+<h1>Make clips.<br><span>Skip the hassle.</span></h1>
+<p>Upload a video and create a short clip from your phone.</p>
+
+<section>
+<h3>01 / Upload a video</h3>
+<input id="video" type="file" accept="video/*">
+<button onclick="uploadVideo()">Upload video</button>
+<p id="uploadStatus">Choose a video to begin.</p>
+</section>
+
+<section>
+<h3>02 / Paste a video link</h3>
+<input id="videoUrl" type="url" placeholder="Paste a video link">
+<button onclick="checkLink()">Check link</button>
+<p id="linkStatus">Automatic link clipping is not enabled yet.</p>
+</section>
+
+<section>
+<h3>03 / Create your clip</h3>
+<label>Start time (seconds)</label>
+<input id="start" type="number" min="0" value="0">
+<label>Clip length (seconds, maximum 180)</label>
+<input id="duration" type="number" min="1" max="180" value="30">
+<button id="clipButton" onclick="createClip()" disabled>Create clip</button>
+<p id="clipStatus">Upload a video first.</p>
+</section>
+
+<p>Early version: basic clips only. AI highlight detection, user accounts and the daily 20-clip limit are not ready yet.</p>
+</main>
+<script>
+const API="https://cliprush-api.onrender.com";
+let jobId=null;
+async function uploadVideo(){
+ const f=document.getElementById("video").files[0];
+ const s=document.getElementById("uploadStatus");
+ if(!f){s.textContent="Choose a video first.";return}
+ s.textContent="Uploading…";
+ try{
+  const data=new FormData();data.append("file",f);
+  const r=await fetch(API+"/v1/uploads?user_id=demo-user",{method:"POST",body:data});
+  const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);
+  jobId=d.job_id;document.getElementById("clipButton").disabled=false;
+  s.textContent="Upload received! Job ID: "+jobId;
+ }catch(e){s.textContent="Upload failed: "+e.message}
+}
+async function checkLink(){
+ const s=document.getElementById("linkStatus");s.textContent="Checking…";
+ try{
+  const r=await fetch(API+"/v1/links/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:document.getElementById("videoUrl").value,user_id:"demo-user"})});
+  const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);
+  s.textContent="Platform: "+d.platform+". Automatic clipping is "+(d.can_process_automatically?"available":"not enabled yet")+". "+(d.message||"");
+ }catch(e){s.textContent="Could not check link: "+e.message}
+}
+async function createClip(){
+ const s=document.getElementById("clipStatus");
+ const start=Number(document.getElementById("start").value);
+ const duration=Number(document.getElementById("duration").value);
+ if(!jobId){s.textContent="Upload a video first.";return}
+ if(start<0||duration<1||duration>180){s.textContent="Use a start of 0 or more and a length of 1–180 seconds.";return}
+ s.textContent="Creating clip…";
+ try{
+  let r=await fetch(API+"/v1/jobs/"+encodeURIComponent(jobId)+"/process?start_seconds="+start+"&duration_seconds="+duration,{method:"POST"});
+  let d=await r.json();if(!r.ok)throw Error(d.detail||r.status);
+  r=await fetch(API+"/v1/jobs/"+encodeURIComponent(jobId));
+  d=await r.json();if(!r.ok)throw Error(d.detail||r.status);
+  if(d.status==="completed"){
+   s.textContent="Clip ready! ";
+   const a=document.createElement("a");a.href=API+"/v1/jobs/"+encodeURIComponent(jobId)+"/download";a.textContent="Download your clip";a.style.color="#55e3d0";a.target="_blank";s.appendChild(a);
+  }else{s.textContent="Status: "+d.status+". "+(d.message||"Please try again later.")}
+ }catch(e){s.textContent="Clip creation failed: "+e.message}
+}
+</script>
+</body>
+</html>
