@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipRush - AI Clip Creator</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #10111b;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .card {
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 24px;
+      background: #1d2030;
+      border-radius: 18px;
+    }
+    h1 { color: #8b7cff; }
+    p { color: #c8cada; line-height: 1.6; }
+    input, button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+    input {
+      background: #10111b;
+      border: 1px solid #454963;
+      color: white;
+    }
+    button {
+      background: #7565ff;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+    #status { margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>ClipRush ⚡</h1>
+    <p>Turn your videos into shareable clips.</p>
+    <input id="videoUrl" type="url"
+      placeholder="Paste a supported video link">
+    <button onclick="checkVideo()">Check Video Link</button>
+    <p id="status">Ready when you are.</p>
+  </div>
+  <script>
+    function checkVideo() {
+      const url = document.getElementById('videoUrl').value.trim();
+      const status = document.getElementById('status');
+
+      if (!url) {
+        status.textContent = 'Please paste a video link first.';
+        return;
+      }
+
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' &&
+            parsed.protocol !== 'http:') {
+          throw new Error();
+        }
+        status.textContent =
+          'Link entered. Video processing is not connected yet.';
+      } catch {
+        status.textContent = 'Please enter a valid video URL.';
+      }
+    }
+  </script>
+</body>
+</html>
