@@ -232,3 +232,183 @@ def download_clip(job_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Output file no longer exists.")
     return FileResponse(path, media_type="video/mp4", filename=f"cliprush-{job_id}.mp4")
+# ---------- CLIPRUSH SMART CLIPPER ----------
+
+@app.post("/v1/jobs/{job_id}/smart-process")
+def smart_process(job_id: str):
+    job = JOBS.get(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    if job.get("platform") != "upload" or not job.get("source_path"):
+        raise HTTPException(status_code=400, detail="Upload a video first.")
+
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        raise HTTPException(status_code=503, detail="FFmpeg and FFprobe are required.")
+
+    source = Path(job["source_path"])
+
+    if not source.exists():
+        raise HTTPException(status_code=404, detail="Uploaded video not found.")
+
+    # Read video duration.
+    probe = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(source)
+        ],
+        capture_output=True, text=True, timeout=60
+    )
+
+    try:
+        duration = float(probe.stdout.strip())
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Could not read video duration.")
+
+    if duration < 3:
+        raise HTTPException(status_code=400, detail="Video is too short.")
+
+    # Detect quiet sections in the audio.
+    silence_intervals = []
+
+    audio = subprocess.run(
+        [
+            "ffmpeg", "-i", str(source),
+            "-af", "silencedetect=noise=-35dB:d=0.5",
+            "-f", "null", "-"
+        ],
+        capture_output=True, text=True, timeout=600
+    )
+
+    log = audio.stderr
+
+    starts = re.findall(r"silence_start:\s*([\d.]+)", log)
+    ends = re.findall(r"silence_end:\s*([\d.]+)", log)
+
+    for start, end in zip(starts, ends):
+        silence_intervals.append((float(start), float(end)))
+
+    if len(starts) > len(ends):
+        silence_intervals.append((float(starts[-1]), duration))
+
+    # Score 30-second windows by how much non-silent audio they contain.
+    clip_length = min(30.0, duration)
+    step = max(5.0, clip_length / 3)
+    candidates = []
+
+    position = 0.0
+
+    while position + clip_length <= duration + 0.01:
+        quiet_time = 0.0
+
+        for quiet_start, quiet_end in silence_intervals:
+            overlap_start = max(position, quiet_start)
+            overlap_end = min(position + clip_length, quiet_end)
+
+            if overlap_end > overlap_start:
+                quiet_time += overlap_end - overlap_start
+
+        active_time = max(0.0, clip_length - quiet_time)
+        score = active_time / clip_length
+
+        candidates.append({
+            "start": round(position, 2),
+            "duration": round(clip_length, 2),
+            "score": round(score, 3)
+        })
+
+        position += step
+
+    if not candidates:
+        candidates.append({
+            "start": 0.0,
+            "duration": round(clip_length, 2),
+            "score": 1.0
+        })
+
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+
+    # Select up to three different moments.
+    selected = []
+
+    for candidate in candidates:
+        if all(
+            abs(candidate["start"] - item["start"]) >= clip_length * 0.6
+            for item in selected
+        ):
+            selected.append(candidate)
+
+        if len(selected) == 3:
+            break
+
+    # Export each selected clip.
+    results = []
+
+    for number, candidate in enumerate(selected, start=1):
+        output = OUTPUT_DIR / f"{job_id}-smart-{number}.mp4"
+
+        command = [
+            "ffmpeg", "-y",
+            "-ss", str(candidate["start"]),
+            "-i", str(source),
+            "-t", str(candidate["duration"]),
+            "-c", "copy",
+            "-movflags", "+faststart",
+            str(output)
+        ]
+
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=900
+        )
+
+        if result.returncode == 0 and output.exists() and output.stat().st_size > 0:
+            results.append({
+                "clip_number": number,
+                "start_seconds": candidate["start"],
+                "duration_seconds": candidate["duration"],
+                "activity_score": candidate["score"],
+                "title": f"ClipRush Best Moment {number}",
+                "download_endpoint": f"/v1/jobs/{job_id}/smart-download/{number}"
+            })
+
+    if not results:
+        raise HTTPException(status_code=500, detail="No clips could be exported.")
+
+    job["smart_clips"] = results
+    job["status"] = "completed"
+    job["message"] = f"Smart Clipper created {len(results)} clips."
+
+    return {
+        "job_id": job_id,
+        "status": "completed",
+        "clips_created": len(results),
+        "clips": results,
+        "message": job["message"]
+    }
+
+
+@app.get("/v1/jobs/{job_id}/smart-download/{clip_number}")
+def download_smart_clip(job_id: str, clip_number: int):
+    job = JOBS.get(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    if clip_number < 1 or clip_number > 3:
+        raise HTTPException(status_code=404, detail="Clip not found.")
+
+    path = OUTPUT_DIR / f"{job_id}-smart-{clip_number}.mp4"
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Smart clip not found.")
+
+    from fastapi.responses import FileResponse
+
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=f"cliprush-smart-{clip_number}.mp4"
+    )
