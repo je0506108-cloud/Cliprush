@@ -96,7 +96,65 @@ async function uploadVideo(){
  button.disabled=false;
  }
 }
+async function smartClip(){
+ const file=document.getElementById('video').files[0];
+ const status=document.getElementById('status');
+ const button=document.getElementById('smartBtn');
+ const download=document.getElementById('download'); 
 
+ download.innerHTML='';
+
+ if(!file){
+  status.textContent='Please choose a video first.';
+  return;
+ }
+
+ button.disabled=true;
+ status.textContent='Uploading video for Smart Clipper...';
+
+ try{
+  const form=new FormData();
+  form.append('file',file);
+
+  const upload=await fetch(API+'/v1/uploads',{
+   method:'POST',
+   body:form
+  });
+
+  const uploaded=await upload.json();
+  if(!upload.ok) throw new Error(uploaded.detail||'Upload failed.');
+
+  const jobId=uploaded.job_id||uploaded.id;
+  if(!jobId) throw new Error('No job ID received.');
+
+  status.textContent='Finding the best moments...';
+
+  const response=await fetch(
+   API+'/v1/jobs/'+encodeURIComponent(jobId)+'/smart-process',
+   {method:'POST'}
+  );
+
+  const result=await response.json();
+  if(!response.ok) throw new Error(result.detail||'Smart processing failed.');
+
+  status.textContent='Smart Clipper created '+result.clips_created+' clip(s)!';
+
+  (result.clips||[]).forEach(clip=>{
+   const link=document.createElement('a');
+   link.href=API+clip.download_endpoint;
+   link.textContent='Download clip '+clip.clip_number;
+   link.style.display='block';
+   link.style.marginTop='12px';
+   link.target='_blank';
+   download.appendChild(link);
+  });
+
+ }catch(error){
+  status.textContent='Error: '+error.message;
+ }finally{
+  button.disabled=false;
+ }
+}
 async function checkVideo(){
  const url=document.getElementById('videoUrl').value.trim();
  const status=document.getElementById('status');
