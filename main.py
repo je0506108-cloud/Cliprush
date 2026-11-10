@@ -375,7 +375,7 @@ def smart_process(job_id: str):
     for number, candidate in enumerate(selected, start=1):
         output = OUTPUT_DIR / f"{job_id}-smart-{number}.mp4"
 
-                command = [
+        command = [
             "ffmpeg", "-y",
             "-ss", str(candidate["start"]),
             "-i", str(source),
@@ -395,6 +395,7 @@ def smart_process(job_id: str):
             "-b:a", "128k",
             "-movflags", "+faststart",
             str(output)
+        ]
                 ]
                 ]
         ]
