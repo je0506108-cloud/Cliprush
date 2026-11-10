@@ -329,8 +329,8 @@ def smart_process(job_id: str):
                 quiet_time += overlap_end - overlap_start
 
         active_time = max(0.0, clip_length - quiet_time)
-            audio_score = active_time / clip_length
 
+        audio_score = active_time / clip_length
         scene_count = sum(
             1 for scene_time in scene_changes
             if position <= scene_time < position + clip_length
