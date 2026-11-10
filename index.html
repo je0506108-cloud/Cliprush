@@ -45,6 +45,7 @@ hr{border:1px solid #454963;margin:25px 0}
 <script>
 const API='https://cliprush-api.onrender.com';
 
+
 async function uploadVideo(){
  const file=document.getElementById('video').files[0];
  const status=document.getElementById('status');
@@ -61,25 +62,42 @@ async function uploadVideo(){
  }
 
  button.disabled=true;
- status.textContent='Uploading video...';
  try{
+ status.textContent='Step 1/3: Uploading video...';
  const form=new FormData();
  form.append('file',file);
- const upload=await fetch(API+'/v1/uploads',{method:'POST',body:form});
+
+ let upload;
+ try {
+  upload=await fetch(API+'/v1/uploads',{method:'POST',body:form});
+ } catch(e) {
+  throw new Error('UPLOAD CONNECTION FAILED: '+e.message);
+ }
  const uploaded=await upload.json();
- if(!upload.ok)throw new Error(uploaded.detail||'Upload failed.');
+ if(!upload.ok)throw new Error('UPLOAD SERVER ERROR: '+(uploaded.detail||upload.status));
 
  const jobId=uploaded.job_id||uploaded.id;
  if(!jobId)throw new Error('Upload response did not include a job ID.');
 
- status.textContent='Video uploaded. Creating your clip...';
- const response=await fetch(API+'/v1/jobs/'+encodeURIComponent(jobId)+'/process?start_seconds='+start+'&duration_seconds='+duration,{method:'POST'});
+ status.textContent='Step 2/3: Creating your clip...';
+ let response;
+ try {
+  response=await fetch(API+'/v1/jobs/'+encodeURIComponent(jobId)+'/process?start_seconds='+start+'&duration_seconds='+duration,{method:'POST'});
+ } catch(e) {
+  throw new Error('PROCESS CONNECTION FAILED: '+e.message);
+ }
  const result=await response.json();
- if(!response.ok)throw new Error(result.detail||'Clip processing failed.');
+ if(!response.ok)throw new Error('PROCESS SERVER ERROR: '+(result.detail||response.status));
 
- status.textContent='Clip processing request completed.';
- const downloadResponse=await fetch(API+'/v1/jobs/'+encodeURIComponent(jobId)+'/download');
- if(downloadResponse.ok){
+ status.textContent='Step 3/3: Preparing download...';
+ let downloadResponse;
+ try {
+  downloadResponse=await fetch(API+'/v1/jobs/'+encodeURIComponent(jobId)+'/download');
+ } catch(e) {
+  throw new Error('DOWNLOAD CONNECTION FAILED: '+e.message);
+ }
+ if(!downloadResponse.ok)throw new Error('DOWNLOAD SERVER ERROR: HTTP '+downloadResponse.status);
+
  const blob=await downloadResponse.blob();
  const url=URL.createObjectURL(blob);
  const link=document.createElement('a');
@@ -87,14 +105,25 @@ async function uploadVideo(){
  link.download='cliprush-clip.mp4';
  link.textContent='Download your clip';
  document.getElementById('download').appendChild(link);
- }else{
- status.textContent+=' The download is not ready yet.';
- }
+ status.textContent='Clip created successfully!';
  }catch(error){
  status.textContent='Error: '+error.message;
  }finally{
  button.disabled=false;
  }
+}
+
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+ 
 }
 async function smartClip(){
  const file=document.getElementById('video').files[0];
