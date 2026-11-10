@@ -32,7 +32,7 @@ hr{border:1px solid #454963;margin:25px 0}
 <input id="start" type="number" min="0" value="0">
 <label for="duration">Clip length (seconds)</label>
 <input id="duration" type="number" min="1" max="180" value="30">
-<button id="uploadBtn" onclick="uploadVideo()">Upload and create clip</button>
+<button id="uploadBtn" onclick="document.getElementById('status').textContent='BUTTON WORKS'; uploadVideo()">Upload and create clip</button>
 <button id="smartBtn" onclick="smartClip()">Find best moments automatically ⚡</button>
 <hr>
 <h3>2. Check a video link</h3>
