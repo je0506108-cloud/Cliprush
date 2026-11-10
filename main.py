@@ -34,10 +34,7 @@ app = FastAPI(title=APP_NAME, version="0.1.0",
               description="Starter API. Configure HTTPS hosting and an approved media provider before public launch.")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-    "https://je0506108-cloud.github.io",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    allow_origins=["*"],
 ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
