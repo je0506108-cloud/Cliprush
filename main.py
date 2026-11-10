@@ -396,6 +396,7 @@ def smart_process(job_id: str):
             "-movflags", "+faststart",
             str(output)
                 ]
+                ]
         ]
 
         result = subprocess.run(
