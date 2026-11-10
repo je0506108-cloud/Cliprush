@@ -338,7 +338,7 @@ def smart_process(job_id: str):
         ):
             selected.append(candidate)
 
-        if len(selected) == 3:
+        if len(selected) == 5:
             break
 
     # Export each selected clip.
@@ -394,7 +394,7 @@ def download_smart_clip(job_id: str, clip_number: int):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
 
-    if clip_number < 1 or clip_number > 3:
+    if clip_number < 1 or clip_number > 5:
         raise HTTPException(status_code=404, detail="Clip not found.")
 
     path = OUTPUT_DIR / f"{job_id}-smart-{clip_number}.mp4"
