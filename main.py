@@ -375,14 +375,27 @@ def smart_process(job_id: str):
     for number, candidate in enumerate(selected, start=1):
         output = OUTPUT_DIR / f"{job_id}-smart-{number}.mp4"
 
-        command = [
+                command = [
             "ffmpeg", "-y",
             "-ss", str(candidate["start"]),
             "-i", str(source),
             "-t", str(candidate["duration"]),
-            "-c", "copy",
+            "-filter_complex",
+            "[0:v]split=2[bg][fg];"
+            "[bg]scale=1080:1920:force_original_aspect_ratio=increase,"
+            "crop=1080:1920,boxblur=20:10[bg];"
+            "[fg]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[v]",
+            "-map", "[v]",
+            "-map", "0:a?",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-b:a", "128k",
             "-movflags", "+faststart",
             str(output)
+                ]
         ]
 
         result = subprocess.run(
