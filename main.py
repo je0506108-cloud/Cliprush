@@ -291,6 +291,26 @@ def smart_process(job_id: str):
     if len(starts) > len(ends):
         silence_intervals.append((float(starts[-1]), duration))
 
+    # Detect major visual scene changes.
+    scene_changes = []
+
+    scene_result = subprocess.run(
+        [
+            "ffmpeg", "-i", str(source),
+            "-vf", "select='gt(scene,0.30)',showinfo",
+            "-an", "-f", "null", "-"
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600
+    )
+
+    scene_changes = [
+        float(t) for t in re.findall(
+            r"pts_time:([0-9.]+)", scene_result.stderr
+        )
+    ]
+
     # Score 30-second windows by how much non-silent audio they contain.
     clip_length = min(30.0, duration)
     step = max(5.0, clip_length / 3)
